@@ -25,7 +25,7 @@ d_APM^2(i,j) = 2 * d_ADD^2(i,j) + d_TPD^2(i,j)
 
 ```
 apm_add_tpd_mds.R              分析コード（上から下へ実行）
-data/trade_2023_comtrade.csv   二国間輸出額（UN Comtrade, 2023年, 8か国, 米ドル）
+data/trade_2023_comtrade.csv   二国間輸出額（UN Comtrade, 2023年, 8か国, 10億米ドル）
 data/trade_2023_comtrade_source.md   データの出典・取得条件・注意点
 ```
 
