@@ -4,19 +4,19 @@
 
 ## 概要
 
-非対称非類似度行列 `D` を対称成分 `S` と歪対称成分 `A` に分解したうえで、
+非対称非類似度行列 `Δ` を対称成分 `S` と歪対称成分 `A` に分解したうえで、
 `A` から3つの非類似度行列を構成し、それぞれに多次元尺度構成法を適用する。
 
-| 略語 | 名称 | 定義 |
+| 行列 | 名称 | 要素 |
 |---|---|---|
-| APM | Asymmetric Profile Measure | `A` の列ベクトル間のユークリッド距離 |
-| ADD | Asymmetric Distance Decomposition | 対象ペア自身の非対称量 `|a_ij|` |
-| TPD | Third-party Profile Decomposition | 第三者に対するプロファイルの差 |
+| APM | Asymmetric Profile Measure | `A` の列ベクトル間のユークリッド距離 `d_APM(i,j)` |
+| ADD | Asymmetric Distance Decomposition | 対象ペア自身の非対称量 `δ_ADD(i,j) = |a_ij|` |
+| TPD | Third-party Profile Decomposition | 第三者に対するプロファイルの差 `δ_TPD(i,j)` |
 
 この3者のあいだには次の恒等式が成り立つ（`i ≠ j`）。
 
 ```
-d_APM^2(i,j) = 2 * d_ADD^2(i,j) + d_TPD^2(i,j)
+d_APM^2(i,j) = 2 * δ_ADD^2(i,j) + δ_TPD^2(i,j)
 ```
 
 証明に用いる仮定は「対角成分がゼロ」と「歪対称性」の2つのみで、対象数に依存しない。
@@ -25,14 +25,17 @@ d_APM^2(i,j) = 2 * d_ADD^2(i,j) + d_TPD^2(i,j)
 
 ```
 apm_add_tpd_mds.R              分析コード（上から下へ実行）
-data/trade_2023_comtrade.csv   二国間輸出額（UN Comtrade, 2023年, 8か国, 米ドル）
+data/trade_2023_comtrade.csv   二国間輸出額（UN Comtrade, 2023年, 8か国, 10億米ドル）
 data/trade_2023_comtrade_source.md   データの出典・取得条件・注意点
 ```
 
 ## データ
 
 United Nations Statistics Division, *UN Comtrade Database*
-（2026年8月18日取得）。2023年、全品目（HS TOTAL）、輸出フロー、米ドル、財のみ。
+（2026年8月18日取得）。2023年、全品目（HS TOTAL）、輸出フロー、財のみ。
+
+値は**10億米ドル単位・小数第1位に丸めたもの**で、論文の表1と同一である。
+分析はこの丸めた値に対して行う（論文に載せる表と分析に使う値を一致させるため）。
 
 行が輸出国、列が輸出先で、**全セルが輸出国自身の報告値（FOB建て）に統一**されている。
 輸入国報告（CIF建て）を混ぜると評価基準の差が見かけの非対称性に化けるため、
@@ -42,29 +45,28 @@ United Nations Statistics Division, *UN Comtrade Database*
 
 ```r
 install.packages(c("ggplot2", "ggrepel", "smacof"))
-
-trade_2023_comtrade <- read.csv("data/trade_2023_comtrade.csv")
-source("apm_add_tpd_mds.R")
+source("apm_add_tpd_mds.R", encoding = "UTF-8")
 ```
 
-コードは関数にまとめず、上から下へ順に読める形で書いてある。
+コードはリポジトリ直下で実行する（`data/` への相対パスで CSV を読む）。
+関数にまとめず、上から下へ順に読める形で書いてある。
 似た処理は3回書き下してあり、冗長だが追いやすさを優先している。
 
 ## 手法とMDSの対応
 
-- `Δ_APM` はベクトル間のユークリッド距離を要素とするため常にユークリッド距離行列となる。
+- APM はベクトル間のユークリッド距離を要素とするため常にユークリッド距離行列となる。
   古典的多次元尺度構成法（`cmdscale`）をそのまま適用できる。
-- `Δ_ADD` と `Δ_TPD` は三角不等式の保証をもたないため、SMACOF（`smacof::mds`）を用いる。
+- ADD と TPD は三角不等式の保証をもたないため、SMACOF（`smacof::mds`）を用いる。
 
-## 結果の要約（2023年、8か国、`d = -log T`）
+## 結果の要約（2023年、8か国、`δ = -log T`）
 
 | | 手続き | 適合 |
 |---|---|---|
-| APM | CMDS | 2次元説明率 91.0%、負の固有値なし |
+| APM | CMDS | 2次元説明率 90.9%、負の固有値なし |
 | ADD | SMACOF | stress-1 = 0.392 |
 | TPD | SMACOF | stress-1 = 0.082 |
 
-直接項が APM の二乗距離に占める割合は 28ペアで 0.1%〜61.2%（平均 16.0%、中央値 13.1%）。
+直接項が APM の二乗距離に占める割合は 28ペアで 0.1%〜61.3%（平均 16.0%、中央値 13.0%）。
 
 ## ライセンス
 

@@ -1,8 +1,8 @@
 # ============================================================================
 #  歪対称行列に基づく非対称MDS：APM / ADD / TPD の3手法
 #
-#  前提：R Canvas のシート trade_2023_comtrade
-#        （UN Comtrade 2023年、行=輸出国、列=輸出先、単位=米ドル）
+#  前提：data/trade_2023_comtrade.csv（このリポジトリに同梱）
+#        （UN Comtrade 2023年、行=輸出国、列=輸出先、単位=10億米ドル）
 #  必要：install.packages(c("ggplot2", "ggrepel", "smacof"))
 # ============================================================================
 
@@ -17,7 +17,7 @@ library(smacof)
 # シートは1列目が国名、2列目以降が各輸出先への輸出額。
 # data.matrix で数値部分だけを行列にし、行名を国名にする。
 
-trade <- trade_2023_comtrade
+trade <- read.csv("data/trade_2023_comtrade.csv", fileEncoding = "UTF-8-BOM")
 rownames(trade) <- trade$country
 T <- data.matrix(trade[, -1])   # 1列目（国名）を除く
 
@@ -33,29 +33,29 @@ print(T)
 #  2. 輸出額を非類似度に変換する
 # ============================================================================
 # 輸出額が大きいほど「近い」ので、対数をとって符号を反転する。
-#     d_ij = -log(T_ij)
+#     δ_ij = -log(T_ij)
 #
 # こうすると歪対称成分の要素が
 #     a_ij = (1/2) * log(T_ji / T_ij)
 # になる。二方向の貿易額の対数比の半分で、解釈しやすい。
 #
-# 対角は 0 にしておく。ただし a_ii = (d_ii - d_ii)/2 = 0 なので、
+# 対角は 0 にしておく。ただし a_ii = (δ_ii - δ_ii)/2 = 0 なので、
 # 実は対角に何を入れても A の対角は 0 になる。
 
-D <- -log(T)
-diag(D) <- 0
+Delta <- -log(T)
+diag(Delta) <- 0
 
-print(round(D, 3))
+print(round(Delta, 3))
 
 
 # ============================================================================
 #  3. 対称成分 S と歪対称成分 A に分ける
 # ============================================================================
-#     S = (D + D') / 2   … 二方向の平均。今回は使わないが確認用に作る
-#     A = (D - D') / 2   … 二方向の差。これが本研究の対象
+#     S = (Δ + Δ') / 2   … 二方向の平均。今回は使わないが確認用に作る
+#     A = (Δ - Δ') / 2   … 二方向の差。これが本研究の対象
 
-S <- (D + t(D)) / 2
-A <- (D - t(D)) / 2
+S <- (Delta + t(Delta)) / 2
+A <- (Delta - t(Delta)) / 2
 
 # 歪対称になっているか目で確かめる
 cat("A + t(A) がゼロか :", all(abs(A + t(A)) < 1e-12), "\n")
@@ -73,17 +73,17 @@ print(round(A, 3))
 # 「対象 i が他の全対象に対してもつ方向差」を並べたベクトル同士を比べている。
 # dist(t(A)) 一行でも書けるが、何をしているか見えるように二重ループで書く。
 
-APM2 <- matrix(0, n, n, dimnames = list(nm, nm))
+d_APM2 <- matrix(0, n, n, dimnames = list(nm, nm))
 
 for (i in 1:n) {
   for (j in 1:n) {
     if (i != j) {
-      APM2[i, j] <- sum((A[, i] - A[, j])^2)   # A[, i] は第 i 列
+      d_APM2[i, j] <- sum((A[, i] - A[, j])^2)   # A[, i] は第 i 列
     }
   }
 }
 
-APM <- sqrt(APM2)
+APM <- sqrt(d_APM2)
 
 print(round(APM, 3))
 
@@ -91,12 +91,12 @@ print(round(APM, 3))
 # ============================================================================
 #  5. ADD を計算する
 # ============================================================================
-#     d_ADD^2(i,j) = a_ij^2
+#     δ_ADD^2(i,j) = a_ij^2
 #
 # 対象ペア自身の非対称量。A の各要素を二乗するだけ。第三者は関与しない。
 
-ADD2 <- A^2
-ADD  <- sqrt(ADD2)      # abs(A) と同じ
+delta_ADD2 <- A^2
+ADD  <- sqrt(delta_ADD2)      # abs(A) と同じ
 
 print(round(ADD, 3))
 
@@ -104,23 +104,23 @@ print(round(ADD, 3))
 # ============================================================================
 #  6. TPD を計算する
 # ============================================================================
-#     d_TPD^2(i,j) = sum_{k != i,j} (a_ki - a_kj)^2
+#     δ_TPD^2(i,j) = sum_{k != i,j} (a_ki - a_kj)^2
 #
 # APM の和から k = i と k = j の項を除いたもの。
 # setdiff(1:n, c(i,j)) が「i でも j でもない k」の並びを作る。
 
-TPD2 <- matrix(0, n, n, dimnames = list(nm, nm))
+delta_TPD2 <- matrix(0, n, n, dimnames = list(nm, nm))
 
 for (i in 1:n) {
   for (j in 1:n) {
     if (i != j) {
       k <- setdiff(1:n, c(i, j))          # 第三者のインデックス（n-2 個）
-      TPD2[i, j] <- sum((A[k, i] - A[k, j])^2)
+      delta_TPD2[i, j] <- sum((A[k, i] - A[k, j])^2)
     }
   }
 }
 
-TPD <- sqrt(TPD2)
+TPD <- sqrt(delta_TPD2)
 
 print(round(TPD, 3))
 
@@ -128,13 +128,13 @@ print(round(TPD, 3))
 # ============================================================================
 #  7. 分解の検算
 # ============================================================================
-# 命題：d_APM^2 = 2 * d_ADD^2 + d_TPD^2
+# 命題：d_APM^2 = 2 * δ_ADD^2 + δ_TPD^2
 # ここがずれたらどこかで間違えている。
 
-cat("分解定理が成立するか :", all(abs(APM2 - (2 * ADD2 + TPD2)) < 1e-10), "\n")
+cat("分解定理が成立するか :", all(abs(d_APM2 - (2 * delta_ADD2 + delta_TPD2)) < 1e-10), "\n")
 
-# 各ペアで直接項が占める割合（本文の表1になる）
-share <- 2 * ADD2 / APM2
+# 各ペアで直接項が占める割合（本文の表3になる）
+share <- 2 * delta_ADD2 / d_APM2
 diag(share) <- NA
 print(round(share * 100, 1))
 
@@ -259,7 +259,7 @@ print(p_tpd)
 
 
 # ============================================================================
-#  13. 表1のもとになる一覧
+#  13. 表3のもとになる一覧
 # ============================================================================
 # 28ペア（8国から2つ選ぶ組み合わせ）を1行ずつ並べる。i < j だけ拾えばよい。
 
@@ -272,7 +272,7 @@ for (i in 1:(n - 1)) {
       ADD   = round(ADD[i, j], 3),
       TPD   = round(TPD[i, j], 3),
       APM   = round(APM[i, j], 3),
-      share = round(2 * ADD2[i, j] / APM2[i, j] * 100, 1)
+      share = round(2 * delta_ADD2[i, j] / d_APM2[i, j] * 100, 1)
     ))
   }
 }
@@ -280,12 +280,16 @@ for (i in 1:(n - 1)) {
 tbl <- tbl[order(-tbl$share), ]     # 直接項の寄与が大きい順
 print(tbl, row.names = FALSE)
 
-cat("直接項の寄与 : 最小", min(tbl$share), "%  最大", max(tbl$share),
-    "%  平均", round(mean(tbl$share), 1), "%  中央値", round(median(tbl$share), 1), "%\n")
+# 要約統計と相関は、表示用に丸めた tbl の列ではなく、丸め前の行列から計算する
+u <- upper.tri(APM)                  # 28ペア（上三角）だけを使う
+sh <- 100 * 2 * delta_ADD2 / d_APM2  # 直接項の寄与（%）
 
-cat("相関 ADD-APM :", round(cor(tbl$ADD, tbl$APM), 3), "\n")
-cat("相関 TPD-APM :", round(cor(tbl$TPD, tbl$APM), 3), "\n")
-cat("相関 ADD-TPD :", round(cor(tbl$ADD, tbl$TPD), 3), "\n")
+cat("直接項の寄与 : 最小", round(min(sh[u]), 1), "%  最大", round(max(sh[u]), 1),
+    "%  平均", round(mean(sh[u]), 1), "%  中央値", round(median(sh[u]), 1), "%\n")
+
+cat("相関 ADD-APM :", round(cor(ADD[u], APM[u]), 3), "\n")
+cat("相関 TPD-APM :", round(cor(TPD[u], APM[u]), 3), "\n")
+cat("相関 ADD-TPD :", round(cor(ADD[u], TPD[u]), 3), "\n")
 
 
 # ============================================================================
