@@ -215,7 +215,7 @@ X_tpd <- X_tpd %*% R
 # 3手法とも同じ作りなので3回書く。coord_equal() は MDS 図では必須。
 # 縦横の縮尺が違うと距離が正しく見えなくなるため。
 
-# --- 図1：APM-MDS ---
+# --- 図2：APM-MDS ---
 df_apm <- data.frame(country = nm, Dim1 = X_apm[, 1], Dim2 = X_apm[, 2])
 
 p_apm <- ggplot(df_apm, aes(Dim1, Dim2, label = country)) +
@@ -229,7 +229,7 @@ p_apm <- ggplot(df_apm, aes(Dim1, Dim2, label = country)) +
 
 print(p_apm)
 
-# --- 図2：ADD-MDS ---
+# --- 図3：ADD-MDS ---
 df_add <- data.frame(country = nm, Dim1 = X_add[, 1], Dim2 = X_add[, 2])
 
 p_add <- ggplot(df_add, aes(Dim1, Dim2, label = country)) +
@@ -243,7 +243,7 @@ p_add <- ggplot(df_add, aes(Dim1, Dim2, label = country)) +
 
 print(p_add)
 
-# --- 図3：TPD-MDS ---
+# --- 図4：TPD-MDS ---
 df_tpd <- data.frame(country = nm, Dim1 = X_tpd[, 1], Dim2 = X_tpd[, 2])
 
 p_tpd <- ggplot(df_tpd, aes(Dim1, Dim2, label = country)) +
@@ -363,7 +363,7 @@ print(round(rowMeans(A), 3))
 
 
 # ============================================================================
-#  17. 検証：TPD 布置（図3）の原点からの距離
+#  17. 検証：TPD 布置（図4）の原点からの距離
 # ============================================================================
 
 cat("\n--- TPD 布置の原点（重心）からの距離 ---\n")
