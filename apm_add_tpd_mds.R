@@ -59,15 +59,19 @@ library(ggrepel)   # 図の国名ラベルが重ならないようにずらす
 # ============================================================================
 
 # CSV の場所。"data/…" は相対パスで、「R の作業ディレクトリから見て data フォルダの中」の意味。
-# R はこのスクリプトがどこに置いてあるかを知らないので、作業ディレクトリがこのスクリプトの
-# あるフォルダになっていないと見つからない。見つからないときは、いま R がどこを見ているか
-# （getwd()）と対処を表示して止まる。
+# R はこのスクリプトがどこに置いてあるかを知らないので、作業ディレクトリ次第で見つからない。
+# よくあるのは、作業ディレクトリが data フォルダそのものになっている場合（CSV を data の中から
+# 読み込んだあとなど）。そのときは data/data/… を探してしまうので、いまのフォルダ直下も見る。
+# どちらにもなければ、いま R がどこを見ているか（getwd()）と対処を表示して止まる。
 #   file.exists(パス)：そのファイルがあるか。getwd()：いまの作業ディレクトリ。
 #   stop(…)：エラーを出して止める。paste0(…)：文字列を隙間なくつなぐ。
-csv_file <- "data/trade_2023_comtrade.csv"
+csv_file <- "data/trade_2023_comtrade.csv"          # 通常：data フォルダの中
+if (!file.exists(csv_file)) {
+  csv_file <- "trade_2023_comtrade.csv"             # 作業ディレクトリが data のとき
+}
 if (!file.exists(csv_file)) {
   stop(paste0(
-    "データファイル ", csv_file, " が見つかりません。
+    "データファイル trade_2023_comtrade.csv が見つかりません。
 ",
     "  いまの R の作業ディレクトリ: ", getwd(), "
 ",
@@ -75,6 +79,8 @@ if (!file.exists(csv_file)) {
 ",
     "  例: setwd(\"C:/.../APM-ADD-TPD論文\")"))
 }
+cat("読み込むファイル :", normalizePath(csv_file), "
+")   # 実際に読んだ場所を表示しておく
 
 # read.csv(ファイル名)：CSV を読み込んで data.frame（表）にする。
 # fileEncoding = "UTF-8-BOM" は、先頭に BOM の付いた UTF-8 ファイルを正しく読む指定。
