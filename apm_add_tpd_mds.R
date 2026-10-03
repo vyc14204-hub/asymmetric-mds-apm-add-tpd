@@ -30,13 +30,16 @@ apm_matrices <- function(M) {
   A   <- skew_decompose(M)$A
   APM <- as.matrix(dist(t(A)))                 # 列ベクトル間ユークリッド距離
   ADD <- abs(A)
-  # TPD は定義どおり k ≠ i, j の和として独立に計算する（恒等式から逆算すると検算にならない）
-  n   <- nrow(A)
-  TPD <- matrix(0, n, n, dimnames = dimnames(A))
-  for (i in 1:n) for (j in 1:n) if (i != j) {
-    k <- setdiff(1:n, c(i, j))
-    TPD[i, j] <- sqrt(sum((A[k, i] - A[k, j])^2))
+  # TPD は式(3)右辺第2項を定義どおりに計算する。恒等式 d_APM^2 = 2 δ_ADD^2 + δ_TPD^2
+  # から逆算すると、下の stopifnot が検算にならないため。
+  n <- nrow(A)
+  tpd_pair <- function(i, j) {
+    others <- setdiff(seq_len(n), c(i, j))        # i と j 以外の対象 k
+    diff_k <- A[others, i] - A[others, j]         # k ごとの偏りの差 a_ki - a_kj
+    sqrt(sum(diff_k^2))                           # 差の二乗和の平方根
   }
+  TPD <- matrix(0, n, n, dimnames = dimnames(A))
+  for (i in seq_len(n)) for (j in seq_len(n)) if (i != j) TPD[i, j] <- tpd_pair(i, j)
   stopifnot(all(abs(APM^2 - (2 * ADD^2 + TPD^2)) < 1e-10))   # 式(7)の検算
   share <- 2 * A^2 / APM^2
   diag(share) <- NA
