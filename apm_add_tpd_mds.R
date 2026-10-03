@@ -68,7 +68,9 @@ skew_decompose <- function(M) {
   diag(M) <- 0
   S <- (M + t(M)) / 2
   A <- (M - t(M)) / 2
-  list(S = S, A = A)
+
+  # 2つの行列を名前付きリストにまとめて返す。呼び出し側では $S, $A で取り出す。
+  return(list(S = S, A = A))
 }
 
 # ----------------------------------------------------------------------------
@@ -124,7 +126,9 @@ apm_matrices <- function(M) {
   share <- 2 * A^2 / APM^2
   diag(share) <- NA
 
-  list(A = A, APM = APM, ADD = ADD, TPD = TPD, share = share)
+  # 5つの行列を名前付きリストにまとめて返す（左が名前、右が中身）。
+  # 呼び出し側では mats <- apm_matrices(M) と受け取り、mats$APM, mats$TPD のように使う。
+  return(list(A = A, APM = APM, ADD = ADD, TPD = TPD, share = share))
 }
 
 # ----------------------------------------------------------------------------
@@ -175,12 +179,13 @@ apm_mds <- function(M, ndim = 2, seed = 123) {
   ev  <- fit_apm$eig
   gof <- sum(ev[1:ndim]) / sum(abs(ev))
 
-  list(matrices = mats,
-       conf     = conf,
-       eig      = ev,
-       gof      = gof,
-       stress   = c(ADD = fit_add$stress, TPD = fit_tpd$stress),
-       fits     = list(apm = fit_apm, add = fit_add, tpd = fit_tpd))
+  # 結果を名前付きリストにまとめて返す。呼び出し側では fit$conf, fit$stress のように使う。
+  return(list(matrices = mats,
+              conf     = conf,
+              eig      = ev,
+              gof      = gof,
+              stress   = c(ADD = fit_add$stress, TPD = fit_tpd$stress),
+              fits     = list(apm = fit_apm, add = fit_add, tpd = fit_tpd)))
 }
 
 # ----------------------------------------------------------------------------
@@ -232,7 +237,8 @@ pair_table <- function(mats) {
                     ADD    = mats$ADD[u],
                     TPD    = mats$TPD[u],
                     share  = 100 * mats$share[u])
-  tbl[order(-tbl$share), ]
+  # 割合の大きい順に並べ替えて返す。
+  return(tbl[order(-tbl$share), ])
 }
 
 # ----------------------------------------------------------------------------
@@ -271,7 +277,8 @@ tri_violations <- function(M) {
     }
   }
 
-  list(count = count, i = worst_i, j = worst_j, l = worst_l)
+  # 違反の数と、最悪の三つ組の番号を名前付きリストにまとめて返す。
+  return(list(count = count, i = worst_i, j = worst_j, l = worst_l))
 }
 
 # ----------------------------------------------------------------------------
@@ -286,7 +293,7 @@ dc_eigen <- function(M) {
   n <- nrow(M)
   J <- diag(n) - matrix(1 / n, n, n)       # 中心化行列
   B <- -0.5 * J %*% (M^2) %*% J            # 二重中心化行列
-  eigen(B, symmetric = TRUE, only.values = TRUE)$values
+  return(eigen(B, symmetric = TRUE, only.values = TRUE)$values)
 }
 
 
