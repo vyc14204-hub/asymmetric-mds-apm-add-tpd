@@ -38,8 +38,13 @@ apm_matrices <- function(M) {
     diff_k <- A[others, i] - A[others, j]         # k ごとの偏りの差 a_ki - a_kj
     sqrt(sum(diff_k^2))                           # 差の二乗和の平方根
   }
-  TPD <- matrix(0, n, n, dimnames = dimnames(A))
-  for (i in seq_len(n)) for (j in seq_len(n)) if (i != j) TPD[i, j] <- tpd_pair(i, j)
+  TPD   <- matrix(0, n, n, dimnames = dimnames(A))
+  pairs <- combn(n, 2)                            # 全ペア (i, j), i < j を列に並べた 2 x 28 の行列
+  for (p in seq_len(ncol(pairs))) {
+    i <- pairs[1, p]
+    j <- pairs[2, p]
+    TPD[i, j] <- TPD[j, i] <- tpd_pair(i, j)      # 対称なので両側に入れる
+  }
   stopifnot(all(abs(APM^2 - (2 * ADD^2 + TPD^2)) < 1e-10))   # 式(7)の検算
   share <- 2 * A^2 / APM^2
   diag(share) <- NA
