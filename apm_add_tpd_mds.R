@@ -273,20 +273,22 @@ apm_mds <- function(mats, ndim = 2, seed = 123) {
 # ----------------------------------------------------------------------------
 #  2.4 布置の図（論文の図1〜3）
 # ----------------------------------------------------------------------------
-# methods に1つ渡せば1枚、省略すれば3枚を横に並べる。
+# 1つの手法（"APM", "ADD", "TPD" のどれか）の布置を1枚の図にする。
 # ggplot2 は「ggplot(データ, aes(x, y)) + 層 + 層 + …」と + でつないで図を組み立てる。
 # coord_equal() で縦横の縮尺を同じにしている（点間の距離を目で比べるため）。
-plot_apm <- function(fit, methods = c("APM", "ADD", "TPD"), seed = 123) {
-  # subset(表, 条件)：条件に合う行だけ取り出す。%in% は「左が右の中に含まれるか」。
-  df <- subset(fit$conf, method %in% methods)
+# seed は ggrepel のラベル配置用。同じ seed なら同じ配置になる。
+plot_apm <- function(fit, method_name, seed = 123) {
+  # subset(表, 条件)：条件に合う行だけ取り出す。== は「等しい」。
+  # 条件の中の method は表の列（APM/ADD/TPD）、method_name は引数で渡された文字列。
+  df <- subset(fit$conf, method == method_name)
   ggplot(df, aes(Dim1, Dim2, label = country)) +                        # x, y, ラベルの列を指定
     geom_hline(yintercept = 0, colour = "grey85", linewidth = 0.3) +   # 原点を通る薄い補助線
     geom_vline(xintercept = 0, colour = "grey85", linewidth = 0.3) +
     geom_point(size = 3.2, colour = "steelblue") +                       # 点
     geom_text_repel(size = 4.2, seed = seed) +                           # 重ならない国名ラベル
-    facet_wrap(~ method, nrow = 1) +                                     # method ごとに1枚ずつ横に
     coord_equal() +
-    labs(x = "Dimension 1", y = "Dimension 2") +                         # 軸ラベル
+    labs(title = paste0(method_name, "-MDS"),                            # 図の見出し（例: APM-MDS）
+         x = "Dimension 1", y = "Dimension 2") +                         # 軸ラベル
     theme_minimal(base_size = 12)                                        # 見た目のテーマ
 }
 
@@ -378,12 +380,10 @@ cat("TPD stress-1    :", round(fit$stress["TPD"], 4), "\n")
 # ----------------------------------------------------------------------------
 #  3.4 図1〜3
 # ----------------------------------------------------------------------------
-# ggplot の図はスクリプト実行時には print() しないと描かれない。
-# 1枚ずつ出したものを論文に使った。最後の1行は3枚を横に並べた確認用。
-print(plot_apm(fit, "APM"))
-print(plot_apm(fit, "ADD"))
-print(plot_apm(fit, "TPD"))
-print(plot_apm(fit))
+# ggplot の図はスクリプト実行時には print() しないと描かれない。1枚ずつ別の図として出す。
+print(plot_apm(fit, "APM"))   # 図1
+print(plot_apm(fit, "ADD"))   # 図2
+print(plot_apm(fit, "TPD"))   # 図3
 
 # ----------------------------------------------------------------------------
 #  3.5 全ペアの一覧と要約（論文7節）
