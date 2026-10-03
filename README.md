@@ -24,7 +24,7 @@ d_APM^2(i,j) = 2 * δ_ADD^2(i,j) + δ_TPD^2(i,j)
 ## ファイル
 
 ```
-apm_add_tpd_mds.R              分析コード（前半が関数、後半が実行部）
+apm_add_tpd_mds.R              分析コード（データの読み込み → 関数定義 → 分析）
 data/trade_2023_comtrade.csv   二国間輸出額（UN Comtrade, 2023年, 8か国, 10億米ドル）
 data/trade_2023_comtrade_source.md   データの出典・取得条件・注意点
 ```
@@ -49,8 +49,9 @@ source("apm_add_tpd_mds.R", encoding = "UTF-8")
 ```
 
 コードはリポジトリ直下で実行する（`data/` への相対パスで CSV を読む）。
-前半に関数（`skew_decompose`, `apm_matrices`, `apm_mds`, `plot_apm`, `pair_table` など）、
-後半に実行部をまとめてある。入力は非対称行列 `M`（対角は無視）で、ここでは輸出額の対数をそのまま渡す。
+先頭でデータを読み込んで表示し、次に関数（`skew_decompose`, `apm_matrices`, `apm_mds`,
+`plot_apm`, `pair_table` など）を定義し、最後に分析を順に実行する。効率より読みやすさを
+優先し、各ステップに論文の式・節との対応を注釈で書いてある。入力は非対称行列 `M`（対角は無視）で、ここでは輸出額の対数をそのまま渡す。
 `a_ij = (1/2) log(T_ij / T_ji)` となり、往復の輸出額の比だけで決まる。
 符号を反転した `-log T` を渡しても `A` の符号が変わるだけで、APM・ADD・TPD はいずれも不変である。
 
