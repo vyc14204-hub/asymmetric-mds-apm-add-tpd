@@ -24,7 +24,8 @@ d_APM^2(i,j) = 2 * δ_ADD^2(i,j) + δ_TPD^2(i,j)
 ## ファイル
 
 ```
-apm_add_tpd_mds.R              分析コード（データの読み込み → 関数定義 → 分析）
+apm_add_tpd_mds.R              分析の本体（データの読み込み → 関数定義 → 3つの行列 → MDS → 図 → 全ペアの一覧）
+apm_add_tpd_checks.R           確認計算（三角不等式と固有値、ADD の次元別ストレス、APM の構造、重心距離）。本体のあとに実行する
 data/trade_2023_comtrade.csv   二国間輸出額（UN Comtrade, 2023年, 8か国, 10億米ドル）
 data/trade_2023_comtrade_source.md   データの出典・取得条件・注意点
 ```
@@ -45,13 +46,16 @@ United Nations Statistics Division, *UN Comtrade Database*
 
 ```r
 install.packages(c("smacof", "vegan", "ggplot2", "ggrepel"))
-source("apm_add_tpd_mds.R", encoding = "UTF-8")
+source("apm_add_tpd_mds.R", encoding = "UTF-8")      # 本体
+source("apm_add_tpd_checks.R", encoding = "UTF-8")   # 確認計算（任意）
 ```
 
 コードはリポジトリ直下で実行する（`data/` への相対パスで CSV を読む）。
-先頭でデータを読み込んで表示し、次に関数（`skew_decompose`, `apm_matrices`, `apm_mds`,
-`plot_apm`, `pair_table` など）を定義し、最後に分析を順に実行する。効率より読みやすさを
-優先し、各ステップに論文の式・節との対応を注釈で書いてある。入力は非対称行列 `M`（対角は無視）で、ここでは輸出額の対数をそのまま渡す。
+本体は、先頭でデータを読み込んで表示し、次に関数（`skew_part`, `apm_from`, `add_from`,
+`tpd_from`, `check_identity`, `apm_matrices`, `apm_mds`, `plot_apm`, `pair_table`）を定義し、
+最後に分析を順に実行する。1行列1関数にしてある。効率より読みやすさを優先し、
+各ステップに論文の式・節との対応と、使っている R の文法の説明を注釈で書いてある。
+本文の裏付けに使った確認計算は別ファイルに分けた。入力は非対称行列 `M`（対角は無視）で、ここでは輸出額の対数をそのまま渡す。
 `a_ij = (1/2) log(T_ij / T_ji)` となり、往復の輸出額の比だけで決まる。
 符号を反転した `-log T` を渡しても `A` の符号が変わるだけで、APM・ADD・TPD はいずれも不変である。
 
