@@ -9,9 +9,12 @@
 #    3. APM の古典的 MDS は A の列の主成分分析と同じこと、A の行平均の順（論文5節末尾）
 #    4. TPD 布置の重心からの距離
 #
+#  計算はできるだけ R 標準の関数（cmdscale, prcomp, svd）に任せ、自前で書くのは
+#  同じことをする標準関数がない三角不等式の数え上げだけにしてある。
+#
 #  使う変数（本体で作られる）：mats（3つの行列）、fit（布置）、nm（国名）、n（対象数）
 #  本体がまだ実行されていなければ、ここで実行する。
-#    exists("mats")：mats という変数があるか。!は否定。source(ファイル)：そのファイルを実行。
+#    exists("mats")：mats という変数があるか。! は否定。source(ファイル)：そのファイルを実行。
 # ============================================================================
 
 if (!exists("mats")) {
@@ -69,14 +72,11 @@ tri_violations <- function(D) {
 # 二重中心化行列 B = -1/2 J D^2 J の固有値（J = I - 11'/n は中心化行列）。
 # D がユークリッド距離行列であることは、B が半正定値（固有値がすべて非負）であることと
 # 同値（論文2節）。最小固有値が負なら、何次元に埋め込んでもその距離は再現できない。
+# この固有値は古典的 MDS の計算そのものなので、自前で中心化せず、R 標準の cmdscale() に
+# eig = TRUE を付けて返してもらう。$eig に n 個の固有値が大きい順に入る（k の値によらない）。
 # 引数 D：対称な非類似度行列。戻り値：固有値（大きい順）。
 dc_eigen <- function(D) {
-  n <- nrow(D)
-  J <- diag(n) - matrix(1 / n, n, n)       # diag(n) は単位行列、matrix(1/n, n, n) は全要素 1/n
-  B <- -0.5 * J %*% (D^2) %*% J            # %*% は行列の積。D^2 は要素ごとの二乗
-  # eigen() は固有値と固有ベクトルを求める。symmetric = TRUE で対称行列向けの計算、
-  # only.values = TRUE で固有値だけ。$values で固有値（大きい順）を取り出す。
-  ev <- eigen(B, symmetric = TRUE, only.values = TRUE)$values
+  ev <- cmdscale(as.dist(D), k = 2, eig = TRUE)$eig
   return(ev)
 }
 
@@ -123,7 +123,8 @@ for (i in 1:n) {
     }
   }
 }
-cat("ADD で三角不等式が破れるペアの数（無順序）:", sum(violated_pair[upper.tri(violated_pair)] | t(violated_pair)[upper.tri(violated_pair)]), "\n")
+n_violated_pairs <- sum(violated_pair[upper.tri(violated_pair)] | t(violated_pair)[upper.tri(violated_pair)])
+cat("ADD で三角不等式が破れるペアの数（無順序）:", n_violated_pairs, "\n")
 
 # ----------------------------------------------------------------------------
 #  2. ADD の適合の悪さは次元不足ではない（論文5節）
@@ -140,19 +141,24 @@ for (k in 2:(n - 1)) {
 # ----------------------------------------------------------------------------
 #  3. APM の古典的 MDS の構造と A の行平均（論文5節末尾）
 # ----------------------------------------------------------------------------
-# APM の二重中心化行列 B は J (A'A) J に一致する。つまり APM の古典的 MDS は、
-# A の列ベクトルを中心化して主成分分析するのと同じ。歪対称行列の特異値は対で現れる。
-# 行平均は、その国が相手全体に対して輸出超過（正）か輸入超過（負）かの目安で、
-# 図2の横軸の並び順と一致する。
-A <- mats$A
-J <- diag(n) - matrix(1 / n, n, n)
-B_from_apm <- -0.5 * J %*% (mats$APM^2) %*% J   # APM から作った二重中心化行列
-B_from_A   <- J %*% (t(A) %*% A) %*% J           # A の列を中心化した内積行列（t(A) %*% A = A'A）
+# APM は A の列ベクトル間のユークリッド距離なので、APM の古典的 MDS は、A の列ベクトル
+# （各国を1つの点とみなす）を中心化して主成分分析するのと同じになる。
+# これを、R 標準の prcomp()（主成分分析）と cmdscale()（古典的 MDS）の結果を突き合わせて
+# 確かめる。prcomp(t(A)) は A の列（国）を観測、行（相手国）を変数とした主成分分析。
+# 主成分の分散 sdev^2 に (n - 1) を掛けたものが、古典的 MDS の固有値に一致するはず。
+# 歪対称行列の特異値は対で現れる（svd(A)$d）。
+# 行平均 rowMeans(A) は、その国が相手全体に対して輸出超過（正）か輸入超過（負）かの
+# 目安で、図2の横軸の並び順と一致する。
+A   <- mats$A
+pca <- prcomp(t(A), center = TRUE, scale. = FALSE)           # A の列（国）の主成分分析
+eig_from_pca <- pca$sdev^2 * (n - 1)                          # 主成分の分散 × (n-1) = 固有値
+eig_from_mds <- dc_eigen(mats$APM)[seq_along(eig_from_pca)]   # 古典的 MDS の固有値（同じ個数だけ）
 
-# svd(A)$d：特異値分解の特異値。paste(…, collapse = " ")：並びを空白区切りの1つの文字列に。
-# rowMeans(A)：各行の平均。
+# paste(…, collapse = " ")：並びを空白区切りの1つの文字列に。
 cat("\n=== APM の構造 ===\n")
-cat("  B と J(A'A)J の最大差 :", format(max(abs(B_from_apm - B_from_A)), digits = 3), "\n")
+cat("  主成分分析の固有値 :", paste(round(eig_from_pca, 4), collapse = " "), "\n")
+cat("  古典的 MDS の固有値:", paste(round(eig_from_mds, 4), collapse = " "), "\n")
+cat("  両者の最大差       :", format(max(abs(eig_from_pca - eig_from_mds)), digits = 3), "\n")
 cat("  A の特異値（対で現れる）:", paste(round(svd(A)$d, 3), collapse = " "), "\n")
 cat("  A の行平均（正なら相手全体に対して輸出超過）\n")
 print(round(rowMeans(A), 3))

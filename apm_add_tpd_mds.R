@@ -88,12 +88,16 @@ cat("対象数 :", n, "か国\n")
 # ----------------------------------------------------------------------------
 # 非対称行列 Δ は、対称成分 S = (Δ + Δ') / 2 と歪対称成分 A = (Δ - Δ') / 2 の和に分けられる。
 # 本研究で使うのは A だけなので、A だけ返す。
+# 計算には R に同梱の Matrix パッケージの skewpart() を使う（(Δ - Δ') / 2 と同じもの）。
+# Matrix::skewpart と書くと、library(Matrix) をしなくてもその関数を呼べる。
+# 結果は Matrix パッケージ独自の型で返るので、as.matrix() で普通の行列に戻す。
 # 対角は先に 0 にしておく。A の対角は Δ の対角が何であっても (δ_ii - δ_ii)/2 = 0 になる。
 # 引数 Delta：n×n の数値行列。戻り値：歪対称成分 A（n×n）。
 skew_part <- function(Delta) {
-  Delta <- as.matrix(Delta)        # data.frame で渡されても行列に直す
-  diag(Delta) <- 0                 # 対角成分を 0 にする
-  A <- (Delta - t(Delta)) / 2      # t() は転置。引き算と / 2 は要素ごとに計算される
+  Delta <- as.matrix(Delta)                   # data.frame で渡されても行列に直す
+  diag(Delta) <- 0                            # 対角成分を 0 にする
+  A <- as.matrix(Matrix::skewpart(Delta))     # 歪対称成分 (Δ - Δ') / 2
+  dimnames(A) <- dimnames(Delta)              # 行名・列名（国名）を付け直す
   return(A)
 }
 
@@ -152,13 +156,16 @@ tpd_from <- function(A) {
 # 式(7)の検算：全ペアで d_APM^2 = 2 δ_ADD^2 + δ_TPD^2 が成り立つこと。
 # これは A が歪対称でありさえすれば必ず成り立つ恒等式なので、ここで止まるとしたら
 # 上の関数のどれかにバグがある。
-# 左辺と右辺の差は理論上 0 だが、小数計算の丸め誤差がわずかに残るので、
-# 差が 1e-10（0.0000000001）未満なら「等しい」とみなす。
-# any(条件)：1つでも条件を満たす要素があれば TRUE。stop(メッセージ)：エラーで止める。
+# 左辺と右辺は理論上一致するが、小数計算の丸め誤差がわずかに残るので、
+# R 標準の all.equal() で比べる。all.equal(x, y) は、x と y が丸め誤差の範囲で等しければ
+# TRUE を、違えば「どう違うか」の文字列を返す。isTRUE() でその結果が TRUE かどうかを見る。
+# stop(メッセージ)：エラーを出して実行を止める。
 check_identity <- function(APM, ADD, TPD) {
-  gap <- abs(APM^2 - (2 * ADD^2 + TPD^2))
-  if (any(gap >= 1e-10)) {
-    stop("式(7)の恒等式が成り立っていません。最大のずれ: ", max(gap))
+  lhs <- APM^2                     # 左辺 d_APM^2
+  rhs <- 2 * ADD^2 + TPD^2         # 右辺 2 δ_ADD^2 + δ_TPD^2
+  comparison <- all.equal(lhs, rhs)
+  if (!isTRUE(comparison)) {
+    stop("式(7)の恒等式が成り立っていません: ", comparison)
   }
 }
 
@@ -228,9 +235,10 @@ apm_mds <- function(mats, ndim = 2, seed = 123) {
   # factor(…, levels = …)：文字列を「順序の決まったカテゴリ」にする。図を APM, ADD, TPD の順に並べるため。
   conf$method <- factor(conf$method, levels = c("APM", "ADD", "TPD"))
 
-  # 2次元説明率：上位 ndim 個の固有値の和を、固有値の絶対値の和で割る（論文4節）。
+  # 2次元説明率（論文4節）。cmdscale が GOF として2通り計算して返す。1つ目が
+  # 「上位 ndim 個の固有値の和 / 固有値の絶対値の和」で、本文で使っている値。
   ev  <- fit_apm$eig
-  gof <- sum(ev[1:ndim]) / sum(abs(ev))
+  gof <- fit_apm$GOF[1]
 
   # c(ADD = …, TPD = …) は名前付きのベクトル。fit$stress["ADD"] で取り出せる。
   stress <- c(ADD = fit_add$stress, TPD = fit_tpd$stress)
