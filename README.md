@@ -51,9 +51,10 @@ source("apm_add_tpd_checks.R", encoding = "UTF-8")   # 確認計算（任意）
 ```
 
 コードはリポジトリ直下で実行する（`data/` への相対パスで CSV を読む）。
-本体は、先頭でデータを読み込んで表示し、次に関数（`skew_part`, `apm_from`, `add_from`,
-`tpd_from`, `check_identity`, `apm_matrices`, `apm_mds`, `plot_apm`, `pair_table`）を定義し、
-最後に分析を順に実行する。1行列1関数にしてある。効率より読みやすさを優先し、
+本体は、先頭でデータを読み込んで表示し、次に関数を定義し、最後に分析を順に実行する。
+関数は手法ごとに分けてある：行列は `apm_from` / `add_from` / `tpd_from`、MDS は
+`mds_apm`（古典的 MDS）/ `mds_add` / `mds_tpd`（SMACOF）、図は `plot_apm` / `plot_add` / `plot_tpd`。
+1行に1つの処理を書き、入れ子の式は中間変数に分けてある。効率より読みやすさを優先し、
 各ステップに論文の式・節との対応と、使っている R の文法の説明を注釈で書いてある。
 本文の裏付けに使った確認計算は別ファイルに分けた。
 計算はできるだけ既存の関数に任せている（歪対称成分は `Matrix::skewpart`、恒等式の検算は

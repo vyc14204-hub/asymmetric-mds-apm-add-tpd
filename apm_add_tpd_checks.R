@@ -11,8 +11,9 @@
 #
 #  計算はできるだけ R 標準の関数（cmdscale, prcomp, svd）に任せ、自前で書くのは
 #  同じことをする標準関数がない三角不等式の数え上げだけにしてある。
+#  書き方の方針は本体と同じ：1行に1つの処理。入れ子の式は中間変数に分ける。
 #
-#  使う変数（本体で作られる）：mats（3つの行列）、fit（布置）、nm（国名）、n（対象数）
+#  使う変数（本体で作られる）：mats（3つの行列）、X_tpd（TPD の布置の座標）、nm（国名）、n（対象数）
 #  本体がまだ実行されていなければ、ここで実行する。
 #    exists("mats")：mats という変数があるか。! は否定。source(ファイル)：そのファイルを実行。
 # ============================================================================
@@ -49,7 +50,9 @@ tri_violations <- function(D) {
         if (i == j || j == l || i == l) {       # || は「または」、== は「等しい」
           next                                   # 3つが異なる組だけ調べる。next で次の回へ
         }
-        gap <- D[i, j] - (D[i, l] + D[l, j])     # 正なら三角不等式が破れている
+        direct  <- D[i, j]                       # i から j へ直接
+        via_l   <- D[i, l] + D[l, j]             # l を経由
+        gap     <- direct - via_l                # 正なら三角不等式が破れている
         if (gap > 1e-12) {                       # 丸め誤差ぶんは違反と数えない
           count <- count + 1
           if (gap > worst_gap) {
@@ -67,6 +70,32 @@ tri_violations <- function(D) {
 }
 
 # ----------------------------------------------------------------------------
+#  三角不等式が破れるペアを数える（無順序のペア単位）
+# ----------------------------------------------------------------------------
+# 本文の「28ペア中18ペア」は、無順序のペア (i, j) のうち、どれかの l で三角不等式が
+# 破れているものの数。tri_violations は順序三つ組で数える（ADD では 92）ので、
+# ペア単位で数え直す。
+# 引数 D：対称な非類似度行列。戻り値：破れているペアの数。
+count_violated_pairs <- function(D) {
+  n <- nrow(D)
+  pairs <- combn(n, 2)                           # 全ペア (i, j), i < j（2×28 の行列）
+  violated_count <- 0
+
+  for (p in seq_len(ncol(pairs))) {
+    i <- pairs[1, p]
+    j <- pairs[2, p]
+    others <- setdiff(seq_len(n), c(i, j))       # 経由点 l の候補：i と j 以外
+    via_each_l <- D[i, others] + D[others, j]    # l ごとの D[i,l] + D[l,j]（ベクトル）
+    shortest_via <- min(via_each_l)              # 最も短い経由
+    if (D[i, j] > shortest_via + 1e-12) {        # 直接のほうが長ければ、このペアは破れている
+      violated_count <- violated_count + 1
+    }
+  }
+
+  return(violated_count)
+}
+
+# ----------------------------------------------------------------------------
 #  二重中心化行列の固有値
 # ----------------------------------------------------------------------------
 # 二重中心化行列 B = -1/2 J D^2 J の固有値（J = I - 11'/n は中心化行列）。
@@ -76,7 +105,9 @@ tri_violations <- function(D) {
 # eig = TRUE を付けて返してもらう。$eig に n 個の固有値が大きい順に入る（k の値によらない）。
 # 引数 D：対称な非類似度行列。戻り値：固有値（大きい順）。
 dc_eigen <- function(D) {
-  ev <- cmdscale(as.dist(D), k = 2, eig = TRUE)$eig
+  distances <- as.dist(D)                                  # 距離行列の型に
+  result    <- cmdscale(distances, k = 2, eig = TRUE)      # 古典的 MDS
+  ev        <- result$eig                                  # 固有値
   return(ev)
 }
 
@@ -96,34 +127,36 @@ dc_eigen <- function(D) {
 # （$ は名前を直接書くとき、[[ ]] は名前が変数に入っているとき）。
 cat("\n=== 三角不等式とユークリッド性 ===\n")
 for (label in c("APM", "ADD", "TPD")) {
-  D  <- mats[[label]]
-  v  <- tri_violations(D)
-  ev <- dc_eigen(D)
-  ratio_pct <- 100 * abs(min(ev)) / max(ev)   # 最小固有値の絶対値 / 最大固有値（%）
+  D <- mats[[label]]
+
+  # 三角不等式
+  v <- tri_violations(D)
+
+  # 二重中心化行列の固有値
+  ev        <- dc_eigen(D)
+  min_eig   <- min(ev)                       # 最小固有値（負ならユークリッドでない）
+  max_eig   <- max(ev)                       # 最大固有値
+  ratio_pct <- 100 * abs(min_eig) / max_eig  # 最小固有値の絶対値 / 最大固有値（%）
 
   # sprintf：書式の %s に文字列、%d に整数、%.4f に小数4桁の数値が順に入る。%% は % そのもの。
-  cat(sprintf("%s : 三角不等式違反 %d 組 / 最小固有値 %.4f（最大固有値比 %.1f%%）\n",
-              label, v$count, min(ev), ratio_pct))
+  line <- sprintf("%s : 三角不等式違反 %d 組 / 最小固有値 %.4f（最大固有値比 %.1f%%）",
+                  label, v$count, min_eig, ratio_pct)
+  cat(line, "\n")
+
+  # 最悪の三つ組（違反があるときだけ）
   if (v$count > 0) {
-    cat(sprintf("     最悪 : %s-%s = %.3f > %s-%s + %s-%s = %.3f\n",
-                nm[v$i], nm[v$j], D[v$i, v$j],
-                nm[v$i], nm[v$l], nm[v$l], nm[v$j], D[v$i, v$l] + D[v$l, v$j]))
+    name_i <- nm[v$i]
+    name_j <- nm[v$j]
+    name_l <- nm[v$l]
+    direct <- D[v$i, v$j]
+    via_l  <- D[v$i, v$l] + D[v$l, v$j]
+    worst  <- sprintf("     最悪 : %s-%s = %.3f > %s-%s + %s-%s = %.3f",
+                      name_i, name_j, direct, name_i, name_l, name_l, name_j, via_l)
+    cat(worst, "\n")
   }
 }
 
-# 本文の「28ペア中18ペア」は、無順序のペア (i, j) のうち、どれかの l で破れているものの数。
-# 上の違反数は順序三つ組で数えたもの（92）なので、ペア単位で数え直す。
-violated_pair <- matrix(FALSE, n, n)
-for (i in 1:n) {
-  for (j in 1:n) {
-    for (l in 1:n) {
-      if (i != j && j != l && i != l && mats$ADD[i, j] > mats$ADD[i, l] + mats$ADD[l, j] + 1e-12) {
-        violated_pair[i, j] <- TRUE
-      }
-    }
-  }
-}
-n_violated_pairs <- sum(violated_pair[upper.tri(violated_pair)] | t(violated_pair)[upper.tri(violated_pair)])
+n_violated_pairs <- count_violated_pairs(mats$ADD)
 cat("ADD で三角不等式が破れるペアの数（無順序）:", n_violated_pairs, "\n")
 
 # ----------------------------------------------------------------------------
@@ -135,7 +168,8 @@ cat("\n=== ADD の次元別 stress-1 ===\n")
 for (k in 2:(n - 1)) {
   set.seed(123)
   fit_k <- mds(as.dist(mats$ADD), ndim = k, type = "ratio")
-  cat(sprintf("  %d次元 : %.4f\n", k, fit_k$stress))
+  line  <- sprintf("  %d次元 : %.4f", k, fit_k$stress)
+  cat(line, "\n")
 }
 
 # ----------------------------------------------------------------------------
@@ -146,33 +180,49 @@ for (k in 2:(n - 1)) {
 # これを、R 標準の prcomp()（主成分分析）と cmdscale()（古典的 MDS）の結果を突き合わせて
 # 確かめる。prcomp(t(A)) は A の列（国）を観測、行（相手国）を変数とした主成分分析。
 # 主成分の分散 sdev^2 に (n - 1) を掛けたものが、古典的 MDS の固有値に一致するはず。
-# 歪対称行列の特異値は対で現れる（svd(A)$d）。
-# 行平均 rowMeans(A) は、その国が相手全体に対して輸出超過（正）か輸入超過（負）かの
-# 目安で、図2の横軸の並び順と一致する。
-A   <- mats$A
-pca <- prcomp(t(A), center = TRUE, scale. = FALSE)           # A の列（国）の主成分分析
-eig_from_pca <- pca$sdev^2 * (n - 1)                          # 主成分の分散 × (n-1) = 固有値
-eig_from_mds <- dc_eigen(mats$APM)[seq_along(eig_from_pca)]   # 古典的 MDS の固有値（同じ個数だけ）
+A <- mats$A
+
+# 主成分分析側
+columns_as_rows <- t(A)                                        # A の列（国）を行に
+pca <- prcomp(columns_as_rows, center = TRUE, scale. = FALSE)  # 主成分分析
+pc_variances <- pca$sdev^2                                     # 各主成分の分散
+eig_from_pca <- pc_variances * (n - 1)                         # 分散 × (n-1) = 固有値
+
+# 古典的 MDS 側（同じ個数だけ取り出す）
+eig_all      <- dc_eigen(mats$APM)                             # n 個の固有値
+how_many     <- length(eig_from_pca)
+eig_from_mds <- eig_all[seq_len(how_many)]
+
+# 突き合わせ
+max_gap <- max(abs(eig_from_pca - eig_from_mds))
 
 # paste(…, collapse = " ")：並びを空白区切りの1つの文字列に。
 cat("\n=== APM の構造 ===\n")
 cat("  主成分分析の固有値 :", paste(round(eig_from_pca, 4), collapse = " "), "\n")
 cat("  古典的 MDS の固有値:", paste(round(eig_from_mds, 4), collapse = " "), "\n")
-cat("  両者の最大差       :", format(max(abs(eig_from_pca - eig_from_mds)), digits = 3), "\n")
-cat("  A の特異値（対で現れる）:", paste(round(svd(A)$d, 3), collapse = " "), "\n")
+cat("  両者の最大差       :", format(max_gap, digits = 3), "\n")
+
+# 歪対称行列の特異値は対で現れる。svd(A)$d：特異値分解の特異値。
+singular_values <- svd(A)$d
+cat("  A の特異値（対で現れる）:", paste(round(singular_values, 3), collapse = " "), "\n")
+
+# 行平均 rowMeans(A)：その国が相手全体に対して輸出超過（正）か輸入超過（負）かの目安。
+# 図2の横軸の並び順と一致する。
+row_means <- rowMeans(A)
 cat("  A の行平均（正なら相手全体に対して輸出超過）\n")
-print(round(rowMeans(A), 3))
+print(round(row_means, 3))
 
 # ----------------------------------------------------------------------------
 #  4. TPD 布置の重心からの距離
 # ----------------------------------------------------------------------------
 # 中心に近い国ほど、他国に対する偏りの向きと大きさが「平均的」であることを示す。
-# subset(…, method == "TPD")[, c("Dim1", "Dim2")]：TPD の行だけ取り、座標の2列だけ残す。
-# scale(scale = FALSE)：重心を原点に。rowSums(X^2)：各行の二乗和。sort()：小さい順。
-X_tpd <- as.matrix(subset(fit$conf, method == "TPD")[, c("Dim1", "Dim2")])
-X_tpd_centered   <- scale(X_tpd, scale = FALSE)
-dist_from_center <- sqrt(rowSums(X_tpd_centered^2))
-names(dist_from_center) <- nm
+# X_tpd は本体で作った TPD の布置の座標（n×2）。
+X_tpd_centered   <- scale(X_tpd, scale = FALSE)   # 重心を原点に
+squared          <- X_tpd_centered^2              # 座標の二乗
+sum_of_squares   <- rowSums(squared)              # 各国の二乗和
+dist_from_center <- sqrt(sum_of_squares)          # 平方根 = 原点からの距離
+names(dist_from_center) <- nm                     # 並びに国名を付ける
+dist_sorted <- sort(dist_from_center)             # 小さい順
 
 cat("\n=== TPD 布置の重心からの距離 ===\n")
-print(round(sort(dist_from_center), 3))
+print(round(dist_sorted, 3))
