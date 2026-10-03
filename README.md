@@ -4,7 +4,7 @@
 
 ## 概要
 
-非対称非類似度行列 `Δ` を対称成分 `S` と歪対称成分 `A` に分解したうえで、
+非対称行列 `M`（本例では二国間輸出額の対数 `log T`）を対称成分 `S` と歪対称成分 `A` に分解したうえで、
 `A` から3つの非類似度行列を構成し、それぞれに多次元尺度構成法を適用する。
 
 | 行列 | 名称 | 要素 |
@@ -24,7 +24,7 @@ d_APM^2(i,j) = 2 * δ_ADD^2(i,j) + δ_TPD^2(i,j)
 ## ファイル
 
 ```
-apm_add_tpd_mds.R              分析コード（上から下へ実行）
+apm_add_tpd_mds.R              分析コード（前半が関数、後半が実行部）
 data/trade_2023_comtrade.csv   二国間輸出額（UN Comtrade, 2023年, 8か国, 10億米ドル）
 data/trade_2023_comtrade_source.md   データの出典・取得条件・注意点
 ```
@@ -44,21 +44,24 @@ United Nations Statistics Division, *UN Comtrade Database*
 ## 実行
 
 ```r
-install.packages(c("ggplot2", "ggrepel", "smacof"))
+install.packages(c("smacof", "vegan", "ggplot2", "ggrepel"))
 source("apm_add_tpd_mds.R", encoding = "UTF-8")
 ```
 
 コードはリポジトリ直下で実行する（`data/` への相対パスで CSV を読む）。
-関数にまとめず、上から下へ順に読める形で書いてある。
-似た処理は3回書き下してあり、冗長だが追いやすさを優先している。
+前半に関数（`skew_decompose`, `apm_matrices`, `apm_mds`, `plot_apm`, `pair_table` など）、
+後半に実行部をまとめてある。入力は非対称行列 `M`（対角は無視）で、ここでは輸出額の対数をそのまま渡す。
+`a_ij = (1/2) log(T_ij / T_ji)` となり、往復の輸出額の比だけで決まる。
+符号を反転した `-log T` を渡しても `A` の符号が変わるだけで、APM・ADD・TPD はいずれも不変である。
 
 ## 手法とMDSの対応
 
 - APM はベクトル間のユークリッド距離を要素とするため常にユークリッド距離行列となる。
   古典的多次元尺度構成法（`cmdscale`）をそのまま適用できる。
-- ADD と TPD は三角不等式の保証をもたないため、SMACOF（`smacof::mds`）を用いる。
+- ADD と TPD はユークリッド距離行列である保証をもたないため、SMACOF（`smacof::mds`, ratio）を用いる。
+- ADD と TPD の布置は `vegan::procrustes`（回転・平行移動のみ）で APM の布置に向きを揃える。
 
-## 結果の要約（2023年、8か国、`δ = -log T`）
+## 結果の要約（2023年、8か国、`M = log T`）
 
 | | 手続き | 適合 |
 |---|---|---|
