@@ -58,11 +58,29 @@ library(ggrepel)   # 図の国名ラベルが重ならないようにずらす
 #  1. データの読み込みと表示（論文3.1節・表1）
 # ============================================================================
 
+# CSV の場所。"data/…" は相対パスで、「R の作業ディレクトリから見て data フォルダの中」の意味。
+# R はこのスクリプトがどこに置いてあるかを知らないので、作業ディレクトリがこのスクリプトの
+# あるフォルダになっていないと見つからない。見つからないときは、いま R がどこを見ているか
+# （getwd()）と対処を表示して止まる。
+#   file.exists(パス)：そのファイルがあるか。getwd()：いまの作業ディレクトリ。
+#   stop(…)：エラーを出して止める。paste0(…)：文字列を隙間なくつなぐ。
+csv_file <- "data/trade_2023_comtrade.csv"
+if (!file.exists(csv_file)) {
+  stop(paste0(
+    "データファイル ", csv_file, " が見つかりません。
+",
+    "  いまの R の作業ディレクトリ: ", getwd(), "
+",
+    "  このスクリプトと data フォルダがあるフォルダを作業ディレクトリにしてから実行してください。
+",
+    "  例: setwd(\"C:/.../APM-ADD-TPD論文\")"))
+}
+
 # read.csv(ファイル名)：CSV を読み込んで data.frame（表）にする。
 # fileEncoding = "UTF-8-BOM" は、先頭に BOM の付いた UTF-8 ファイルを正しく読む指定。
 # CSV の1列目は国名、2列目以降は各輸出先への輸出額。
 # 対角（自国への輸出）は空欄で、NA（欠損）として読み込まれる。
-trade <- read.csv("data/trade_2023_comtrade.csv", fileEncoding = "UTF-8-BOM")
+trade <- read.csv(csv_file, fileEncoding = "UTF-8-BOM")
 
 # 国名を行名にして、数値部分だけを行列にする。
 # trade$country は列 country。trade[, -1] は1列目（国名）を除いた全列。
