@@ -128,7 +128,7 @@ skew_part <- function(Delta) {
 
 # ----------------------------------------------------------------------------
 #  2.2 APM・ADD・TPD の3つの非類似度行列（論文2節）
-#      1行列1関数。最後の apm_matrices がそれらを順に呼んでまとめる。
+#      1行列1関数。分析部（3.2）でこれらを順に呼ぶ。
 # ----------------------------------------------------------------------------
 
 # APM（式(2)）：A の列ベクトルどうしのユークリッド距離。
@@ -205,20 +205,6 @@ share_from <- function(A, APM) {
   share <- numerator / denominator # 要素ごとの割り算
   diag(share) <- NA
   return(share)
-}
-
-# 上の関数を順に呼んで、3つの行列と割合をひとまとめにする。
-# 引数 Delta：非対称行列。戻り値：list(A, APM, ADD, TPD, share)。
-# 呼び出し側では mats <- apm_matrices(Delta) と受け取り、mats$APM, mats$TPD のように使う。
-apm_matrices <- function(Delta) {
-  A   <- skew_part(Delta)
-  APM <- apm_from(A)
-  ADD <- add_from(A)
-  TPD <- tpd_from(A)
-  check_identity(APM, ADD, TPD)
-  share <- share_from(A, APM)
-  result <- list(A = A, APM = APM, ADD = ADD, TPD = TPD, share = share)
-  return(result)
 }
 
 # ----------------------------------------------------------------------------
@@ -336,11 +322,12 @@ plot_tpd <- function(X_tpd) {
 #   a      … 符号つきの a_ij。正なら i から j への輸出のほうが大きい
 #   larger … 大きい向きを "X → Y" で示したもの。ペアを書く順に依らず向きが読める
 #   share  … 100 * 2 a_ij^2 / d_APM^2
-pair_table <- function(mats) {
-  nm <- rownames(mats$A)
+# 引数：A（歪対称成分）、APM、ADD、TPD、share（割合）。いずれも n×n。
+pair_table <- function(A, APM, ADD, TPD, share) {
+  nm <- rownames(A)
 
   # 各ペアを1回ずつ取り出すため、上三角（行番号 < 列番号）の位置を使う。
-  is_upper   <- upper.tri(mats$APM)                 # 上三角の位置が TRUE の行列
+  is_upper   <- upper.tri(APM)                      # 上三角の位置が TRUE の行列
   positions  <- which(is_upper, arr.ind = TRUE)     # TRUE の位置を (行, 列) の番号の表に（28行×2列）
   row_index  <- positions[, 1]                      # 行番号 = ペアの左側の国 i
   col_index  <- positions[, 2]                      # 列番号 = ペアの右側の国 j
@@ -348,11 +335,11 @@ pair_table <- function(mats) {
   to         <- nm[col_index]
 
   # 行列を (行, 列) の表で添字付けすると、その位置の値の並びが取れる。
-  a         <- mats$A[positions]                    # 符号つきの a_ij
-  apm_value <- mats$APM[positions]
-  add_value <- mats$ADD[positions]
-  tpd_value <- mats$TPD[positions]
-  share_pct <- 100 * mats$share[positions]          # 割合を % に
+  a         <- A[positions]                         # 符号つきの a_ij
+  apm_value <- APM[positions]
+  add_value <- ADD[positions]
+  tpd_value <- TPD[positions]
+  share_pct <- 100 * share[positions]               # 割合を % に
 
   # 大きい向き。まず全部「均衡」にしておき、a の符号で書き換える。
   # x[条件] <- 値：条件が TRUE の要素だけを書き換える。
@@ -398,26 +385,31 @@ print(round(Delta, 3))
 # ----------------------------------------------------------------------------
 #  3.2 3つの行列
 # ----------------------------------------------------------------------------
-mats <- apm_matrices(Delta)
+A   <- skew_part(Delta)          # 歪対称成分（式(1)）
+APM <- apm_from(A)               # 列ベクトル間距離（式(2)）
+ADD <- add_from(A)               # |a_ij|
+TPD <- tpd_from(A)               # 第三者項の平方根
+check_identity(APM, ADD, TPD)    # 式(7)の検算。成り立たなければここで止まる
+share <- share_from(A, APM)      # d_APM^2 に占める 2 a_ij^2 の割合
 
 cat("\n=== 歪対称成分 A ===\n")
-print(round(mats$A, 3))
+print(round(A, 3))
 cat("\n=== APM（列ベクトル間距離）===\n")
-print(round(mats$APM, 3))
+print(round(APM, 3))
 cat("\n=== ADD（|a_ij|）===\n")
-print(round(mats$ADD, 3))
+print(round(ADD, 3))
 cat("\n=== TPD（第三者項の平方根）===\n")
-print(round(mats$TPD, 3))
+print(round(TPD, 3))
 cat("\n=== d_APM^2 に占める 2 a_ij^2 の割合（%）===\n")
-print(round(100 * mats$share, 1))
+print(round(100 * share, 1))
 
 # ----------------------------------------------------------------------------
 #  3.3 MDS（論文4節〜6節）
 # ----------------------------------------------------------------------------
 # APM には古典的 MDS、ADD と TPD には SMACOF。
-fit_apm <- mds_apm(mats$APM, ndim = 2)
-fit_add <- mds_add(mats$ADD, ndim = 2)
-fit_tpd <- mds_tpd(mats$TPD, ndim = 2)
+fit_apm <- mds_apm(APM, ndim = 2)
+fit_add <- mds_add(ADD, ndim = 2)
+fit_tpd <- mds_tpd(TPD, ndim = 2)
 
 # 図を見比べやすいよう、ADD と TPD の布置の向きを APM の布置に揃える。
 X_apm <- fit_apm$points
@@ -451,7 +443,7 @@ print(figure_tpd)
 # ----------------------------------------------------------------------------
 #  3.5 全ペアの一覧と要約（論文7節）
 # ----------------------------------------------------------------------------
-tbl <- pair_table(mats)
+tbl <- pair_table(A, APM, ADD, TPD, share)
 
 # format(表, digits = 3, nsmall = 1)：数値を見やすい桁に整える。row.names = FALSE：行番号を出さない。
 tbl_shown <- format(tbl, digits = 3, nsmall = 1)

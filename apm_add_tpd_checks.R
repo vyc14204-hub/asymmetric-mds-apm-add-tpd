@@ -13,12 +13,12 @@
 #  同じことをする標準関数がない三角不等式の数え上げだけにしてある。
 #  書き方の方針は本体と同じ：1行に1つの処理。入れ子の式は中間変数に分ける。
 #
-#  使う変数（本体で作られる）：mats（3つの行列）、X_tpd（TPD の布置の座標）、nm（国名）、n（対象数）
+#  使う変数（本体で作られる）：A, APM, ADD, TPD（行列）、X_tpd（TPD の布置の座標）、nm（国名）、n（対象数）
 #  本体がまだ実行されていなければ、ここで実行する。
-#    exists("mats")：mats という変数があるか。! は否定。source(ファイル)：そのファイルを実行。
+#    exists("TPD")：TPD という変数があるか。! は否定。source(ファイル)：そのファイルを実行。
 # ============================================================================
 
-if (!exists("mats")) {
+if (!exists("TPD")) {
   source("apm_add_tpd_mds.R", encoding = "UTF-8")
 }
 
@@ -123,11 +123,12 @@ dc_eigen <- function(D) {
 # 性質で、前者は後者を含意しない。APM は両方満たし、TPD は三角不等式は満たすが
 # ユークリッドではなく、ADD は三角不等式も破る、という3段階を数値で確かめる。
 # for (label in c(…))：label に "APM", "ADD", "TPD" を順に入れて繰り返す。
-# mats[[label]]：リストから、変数 label に入っている名前の要素を取り出す
+# matrices[[label]]：リストから、変数 label に入っている名前の要素を取り出す
 # （$ は名前を直接書くとき、[[ ]] は名前が変数に入っているとき）。
+matrices <- list(APM = APM, ADD = ADD, TPD = TPD)   # 3つの行列を名前付きリストに
 cat("\n=== 三角不等式とユークリッド性 ===\n")
 for (label in c("APM", "ADD", "TPD")) {
-  D <- mats[[label]]
+  D <- matrices[[label]]
 
   # 三角不等式
   v <- tri_violations(D)
@@ -156,7 +157,7 @@ for (label in c("APM", "ADD", "TPD")) {
   }
 }
 
-n_violated_pairs <- count_violated_pairs(mats$ADD)
+n_violated_pairs <- count_violated_pairs(ADD)
 cat("ADD で三角不等式が破れるペアの数（無順序）:", n_violated_pairs, "\n")
 
 # ----------------------------------------------------------------------------
@@ -167,7 +168,7 @@ cat("ADD で三角不等式が破れるペアの数（無順序）:", n_violated
 cat("\n=== ADD の次元別 stress-1 ===\n")
 for (k in 2:(n - 1)) {
   set.seed(123)
-  fit_k <- mds(as.dist(mats$ADD), ndim = k, type = "ratio")
+  fit_k <- mds(as.dist(ADD), ndim = k, type = "ratio")
   line  <- sprintf("  %d次元 : %.4f", k, fit_k$stress)
   cat(line, "\n")
 }
@@ -180,8 +181,6 @@ for (k in 2:(n - 1)) {
 # これを、R 標準の prcomp()（主成分分析）と cmdscale()（古典的 MDS）の結果を突き合わせて
 # 確かめる。prcomp(t(A)) は A の列（国）を観測、行（相手国）を変数とした主成分分析。
 # 主成分の分散 sdev^2 に (n - 1) を掛けたものが、古典的 MDS の固有値に一致するはず。
-A <- mats$A
-
 # 主成分分析側
 columns_as_rows <- t(A)                                        # A の列（国）を行に
 pca <- prcomp(columns_as_rows, center = TRUE, scale. = FALSE)  # 主成分分析
@@ -189,7 +188,7 @@ pc_variances <- pca$sdev^2                                     # 各主成分の
 eig_from_pca <- pc_variances * (n - 1)                         # 分散 × (n-1) = 固有値
 
 # 古典的 MDS 側（同じ個数だけ取り出す）
-eig_all      <- dc_eigen(mats$APM)                             # n 個の固有値
+eig_all      <- dc_eigen(APM)                                  # n 個の固有値
 how_many     <- length(eig_from_pca)
 eig_from_mds <- eig_all[seq_len(how_many)]
 
