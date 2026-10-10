@@ -28,6 +28,9 @@ apm_add_tpd_mds.R              分析の本体（データの読み込み → �
 apm_add_tpd_checks.R           確認計算（三角不等式と固有値、ADD の次元別ストレス、APM の構造、重心距離）。本体のあとに実行する
 data/trade_2023_comtrade.csv   二国間輸出額（UN Comtrade, 2023年, 8か国, 10億米ドル）
 data/trade_2023_comtrade_source.md   データの出典・取得条件・注意点
+figures/figure1_apm.{pdf,png}  図1（APM の布置）。本体を実行すると再生成される
+figures/figure2_add.{pdf,png}  図2（ADD の布置）
+figures/figure3_tpd.{pdf,png}  図3（TPD の布置）
 ```
 
 ## データ
@@ -53,7 +56,8 @@ source("apm_add_tpd_checks.R", encoding = "UTF-8")   # 確認計算（任意）
 コードはリポジトリ直下で実行する（`data/` への相対パスで CSV を読む）。
 本体は、先頭でデータを読み込んで表示し、次に関数を定義し、最後に分析を順に実行する。
 関数は手法ごとに分けてある：行列は `apm_from` / `add_from` / `tpd_from`、MDS は
-`mds_apm`（古典的 MDS）/ `mds_add` / `mds_tpd`（SMACOF）、図は `plot_apm` / `plot_add` / `plot_tpd`。
+`mds_apm`（古典的 MDS）/ `mds_add` / `mds_tpd`（SMACOF）、図は `plot_configuration`（3枚とも同じ関数で描く）と
+`save_figure`（`figures/` に PDF と PNG を保存する）。
 1行に1つの処理を書き、入れ子の式は中間変数に分けてある。効率より読みやすさを優先し、
 各ステップに論文の式・節との対応と、使っている R の文法の説明を注釈で書いてある。
 本文の裏付けに使った確認計算は別ファイルに分けた。
@@ -63,6 +67,14 @@ source("apm_add_tpd_checks.R", encoding = "UTF-8")   # 確認計算（任意）
 三角不等式の数え上げだけ。入力は非対称行列 `M`（対角は無視）で、ここでは輸出額の対数をそのまま渡す。
 `a_ij = (1/2) log(T_ij / T_ji)` となり、往復の輸出額の比だけで決まる。
 符号を反転した `-log T` を渡しても `A` の符号が変わるだけで、APM・ADD・TPD はいずれも不変である。
+
+## 図
+
+図1〜3は投稿用の体裁で出力する：4.5 × 4.5 インチ、白黒、Arial（軸ラベル 10 pt、目盛り 8 pt）、
+3枚とも同じ軸範囲・同じ縮尺。`figures/` の PDF はベクター形式（フォント埋め込み）、PNG は 600 dpi。
+画面に出す図も `dev.new(width = 4.5, height = 4.5)` で同じ紙の大きさにしてあるので、
+プロット画面から取り出した図をそのまま原稿に貼れる。
+国名ラベルの位置は `ggrepel` が決める（乱数の種を固定してあるので毎回同じ）。
 
 ## 手法とMDSの対応
 

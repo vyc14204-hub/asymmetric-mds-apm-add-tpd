@@ -13,7 +13,7 @@
 #  同じことをする標準関数がない三角不等式の数え上げだけにしてある。
 #  書き方の方針は本体と同じ：1行に1つの処理。入れ子の式は中間変数に分ける。
 #
-#  使う変数（本体で作られる）：A, APM, ADD, TPD（行列）、X_tpd（TPD の布置の座標）、nm（国名）、n（対象数）
+#  使う変数（本体で作られる）：A, APM, ADD, TPD（行列）、coords_xy_tpd（TPD の布置の座標）、nm（国名）、n（対象数）
 #  本体がまだ実行されていなければ、ここで実行する。
 #    exists("TPD")：TPD という変数があるか。! は否定。source(ファイル)：そのファイルを実行。
 # ============================================================================
@@ -35,6 +35,8 @@ if (!exists("TPD")) {
 # 違反のうち超過分 gap が最も大きい三つ組も返す（本文の「中国とインドの 0.992 は
 # 中国とフランスの値とフランスとインドの値の和 0.241 を上回る」はこれ）。
 # 引数 D：対称な非類似度行列。戻り値：list(count = 違反数, i, j, l = 最悪の三つ組の番号)。
+# 使い方：v <- tri_violations(ADD)
+#         違反数は v$count、最悪の三つ組の番号は v$i, v$j, v$l で取り出す。
 tri_violations <- function(D) {
   n <- nrow(D)
   count     <- 0     # 違反の数
@@ -76,6 +78,7 @@ tri_violations <- function(D) {
 # 破れているものの数。tri_violations は順序三つ組で数える（ADD では 92）ので、
 # ペア単位で数え直す。
 # 引数 D：対称な非類似度行列。戻り値：破れているペアの数。
+# 使い方：n_violated_pairs <- count_violated_pairs(ADD)
 count_violated_pairs <- function(D) {
   n <- nrow(D)
   pairs <- combn(n, 2)                           # 全ペア (i, j), i < j（2×28 の行列）
@@ -104,6 +107,7 @@ count_violated_pairs <- function(D) {
 # この固有値は古典的 MDS の計算そのものなので、自前で中心化せず、R 標準の cmdscale() に
 # eig = TRUE を付けて返してもらう。$eig に n 個の固有値が大きい順に入る（k の値によらない）。
 # 引数 D：対称な非類似度行列。戻り値：固有値（大きい順）。
+# 使い方：ev <- dc_eigen(TPD)　　最小固有値は min(ev)、最大固有値は max(ev)。
 dc_eigen <- function(D) {
   distances <- as.dist(D)                                  # 距離行列の型に
   result    <- cmdscale(distances, k = 2, eig = TRUE)      # 古典的 MDS
@@ -167,7 +171,6 @@ cat("ADD で三角不等式が破れるペアの数（無順序）:", n_violated
 # 三角不等式を破る値は何次元の布置でも再現できないため。
 cat("\n=== ADD の次元別 stress-1 ===\n")
 for (k in 2:(n - 1)) {
-  set.seed(123)
   fit_k <- mds(as.dist(ADD), ndim = k, type = "ratio")
   line  <- sprintf("  %d次元 : %.4f", k, fit_k$stress)
   cat(line, "\n")
@@ -215,13 +218,13 @@ print(round(row_means, 3))
 #  4. TPD 布置の重心からの距離
 # ----------------------------------------------------------------------------
 # 中心に近い国ほど、他国に対する偏りの向きと大きさが「平均的」であることを示す。
-# X_tpd は本体で作った TPD の布置の座標（n×2）。
-X_tpd_centered   <- scale(X_tpd, scale = FALSE)   # 重心を原点に
-squared          <- X_tpd_centered^2              # 座標の二乗
-sum_of_squares   <- rowSums(squared)              # 各国の二乗和
-dist_from_center <- sqrt(sum_of_squares)          # 平方根 = 原点からの距離
-names(dist_from_center) <- nm                     # 並びに国名を付ける
-dist_sorted <- sort(dist_from_center)             # 小さい順
+# coords_xy_tpd は本体で作った TPD の布置の座標（n×2）。
+coords_xy_tpd_centered <- scale(coords_xy_tpd, scale = FALSE)   # 重心を原点に
+squared          <- coords_xy_tpd_centered^2                    # 座標の二乗
+sum_of_squares   <- rowSums(squared)                            # 各国の二乗和
+dist_from_center <- sqrt(sum_of_squares)                        # 平方根 = 原点からの距離
+names(dist_from_center) <- nm                                   # 並びに国名を付ける
+dist_sorted <- sort(dist_from_center)                           # 小さい順
 
 cat("\n=== TPD 布置の重心からの距離 ===\n")
 print(round(dist_sorted, 3))

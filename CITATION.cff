@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "このコードやデータを使った場合は、以下のように引用してください。If you use this code or data, please cite it as below."
+type: software
+title: "歪対称行列に基づく非対称多次元尺度構成法（APM / ADD / TPD）: 分析コードとデータ"
+abstract: "Analysis code and data for asymmetric multidimensional scaling based on the skew-symmetric component of an asymmetric matrix (APM / ADD / TPD), with the decomposition identity d_APM^2 = 2 δ_ADD^2 + δ_TPD^2."
+authors:
+  - family-names: "Mori"
+    given-names: "Takemi"
+    affiliation: "Konan Women's University"
+repository-code: "https://github.com/vyc14204-hub/asymmetric-mds-apm-add-tpd"
+license: MIT
+version: "1.0.0"
+date-released: "2026-10-10"
+keywords:
+  - multidimensional scaling
+  - asymmetric data
+  - skew-symmetric matrix
+  - R
